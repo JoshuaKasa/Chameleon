@@ -1,16 +1,10 @@
 #include <iostream>
-#include <random>
 #include <string>
-#include <algorithm>
-#include <time.h>
+#include <ctime>
+#include <random>
 
 using namespace std;
 
-const int KEY_MIN_LENGTH = 1000; // Min key number
-const int KEY_MAX_LENGTH = 99999999; // Max key number
-const int CHAMELEON = 0xAF5C9; // First 6 digits of e do hexadecimal
-
-// Modern random range function -> https://stackoverflow.com/questions/7560114/random-number-c-in-some-range
 int rndrange(int min_num, int max_num)
 {
     random_device rd;
@@ -20,74 +14,99 @@ int rndrange(int min_num, int max_num)
     return distr(gen);
 }
 
-int main()
+int A[4][8];
+
+int C(int X)
 {
-    string str = "Hello world!"; // String to encrypt
-    int length = str.length(); // Length of the string
-    int key = rndrange(KEY_MIN_LENGTH, KEY_MAX_LENGTH); // Generating a key (random number between 1000 and 99999999)
-    int key_length = to_string(key).length(); // Getting key length (4-8)
+    int B = A[0][X >> 32 & 8] + A[3][X >> 16 & 4];
+    return ((B ^ A[X % 4][X >> 8 & 2] + (X & 32)) ^ 16) >> (X % 12);
+}
 
-    clock_t begin = clock(); // Starting run time calculator
+string chameleon_encrypt(string S, int K)
+{
+    int SL = S.length();
+    int KL = to_string(K).length();
 
-    for (int i = 0; i < length; i++) // Iterating through every character of the word
+    for (int i = 0; i <= SL/2; i++)
     {
-        swap(str[length % key_length], str[(int)(CHAMELEON ^ key) % key_length]); // Swapping 2 string characters
-        swap(str[length - key_length], str[(key > CHAMELEON) - 1 + i]); // Swapping 2 string characters
-        // We swap characters and then get the character for not preventing problems
-        char ch = str[i]; // Getting current character of the string
+        int u = SL/2 + i;
+        char L = S[i];
+        char R = S[u];
+        char LB = S[i - 1];
+        char RB = S[u - 1];
 
-        for (int j = 0; j <= 4; j++) // Iterating 4 times through each character
+        for (short int k = 0; k < 4; k++)
         {
-            // We can see characters as number, and so we can operate on them using bitwise and normal operations
-            ch = (int)ch + (key * key);
-            ch += ch << (i + j); // i + j makes it so that the same letters are not the same anymore after encryption
+            short int T = A[k][k + 1] + i;
 
-            for (int k = 1; k <= 2; k++) // Iterating 2 times every iteration
-            {
-                // Performing more operation
-                if (ch ^ ch * j) ch += (key % ch) * 2;
-                else ch += (key * k + i) << 1;
-                // Using the key for operations creates unpredictable patterns
-            }
-
-            // Operations
-            char temp = ch; // Creating a temporary character before overwriting ch
-
-            ch += str[i] >> 2;
-            temp += ch & str[i] + key;
-            ch += temp << 4;
-
-            if ((key + key_length) % 2 == 0) // Using key again for unpredictability
-            {
-                ch += (key / 4) >> 2;
-                ch <<= 1;
-            }
-
-            ch -= (key / key_length) >> 1;
-            ch >>= (1 & temp) + 1;
-
-            ch += ch;
+            L ^= T + K;
+            R ^= T + C(T);
         }
-        ch = abs(ch); // Turning ch into a positive number if it isn't, this make it easier to perform checks on it
+        L ^= C(A[4][KL - 1]) + (LB ^ A[2][2]);
+        R ^= A[0][1] * K + (RB ^ A[3][3]);
 
-        if (ch == 0 || ch == 10 || ch == 32 || ch == 8 || ch == 7 || ch == 9 || ch == 13) // Checking for blank character (\n, \t, ecc)
-        {
-            ch >>= 1;
-            ch -= floor(ch / 4); // turning ch / 4 into an integer
-        }
-
-        str[i] = ch; // Overwriting string character with encrypted one
+        S[i] = L;
+        S[u] = R;
     }
 
-    clock_t end = clock(); // Ending timer
-    // Average MBS encrypted -> 45
+    return S;
+}
 
-    // Printing encryption time, encrypted string and key used
-    cout << "Encrypted: " << str << "\nLength: " << str.length() << endl;
-    cout << "Key: " << key << endl;
+string chameleon_decrypt(string S, int K)
+{
+    int SL = S.length();
+    int KL = to_string(K).length();
+
+    for (int i = SL/2; i >= 0; i--)
+    {
+        int u = SL/2 + i;
+        char L = S[i];
+        char R = S[u];
+        char LB = S[i - 1];
+        char RB = S[u - 1];
+
+        for (short int k = 0; k < 4; k++)
+        {
+            short int T = A[k][k + 1] + i;
+
+            L ^= T + K;
+            R ^= T + C(T);
+        }
+        L ^= C(A[4][KL - 1]) + (LB ^ A[2][2]);
+        R ^= A[0][1] * K + (RB ^ A[3][3]);
+
+        S[i] = L;
+        S[u] = R;
+    }
+
+    return S;
+}
+
+int main()
+{
+    string SS = "Hello world!";
+    long long int KK = rndrange(100000,10000000);
+    int KL = to_string(KK).length();
+
+    for (short int i = 0; i < 4; i++)
+    {
+        for (short int k = 0; k < 8; k++)
+        {
+            A[i][k] += 0x706080AF << 16 + (k + i);
+            A[i][k] -= 0x706080AF ^ C(0x706080AF);
+            A[i][k] = abs(A[i][k]);
+        }
+    }
+
+    clock_t begin = clock();
+
+    SS = chameleon_encrypt(SS, KK);
+
+    clock_t end = clock();
+
+    cout << "Encrypted: " << SS << "\nLength: " << SS.length() << endl;
+    cout << "Key: " << KK << "\nKey bits: " << KL << endl;
     cout << "Time: " << (double)(end - begin) / CLOCKS_PER_SEC;
-
-    // Working on a decryption algorithm
 
     return 0;
 }
