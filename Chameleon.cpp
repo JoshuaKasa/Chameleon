@@ -75,8 +75,8 @@ string chameleon_encrypt(string *SS, const int *K) // S = message to encrypt; K 
         }
         // Using the 2 before characters for non repeating patterns
         // By mixing LB (Left character Before) and RB (Right character Before) we get unpredictable patterns
-        L ^= C(A[3][KL - 1]) + (LB ^ RB);
-        R ^= A[0][1] * *K + (RB ^ LB); // Key usage
+        L ^= C(A[3][KL - 1]) + (LB ^ RB + i);
+        R ^= A[0][1] * *K + (RB ^ LB + (i - 1)); // Key usage
 
         // Assigning encrypted characters to the string
         S[i] = L;
@@ -108,8 +108,8 @@ string chameleon_decrypt(string *SS, const int *K)
             L ^= T + *K;
             R ^= T + C(T);
         }
-        L ^= C(A[3][KL - 1]) + (LB ^ RB);
-        R ^= A[0][1] * *K + (RB ^ LB);
+        L ^= C(A[3][KL - 1]) + (LB ^ RB + i);
+        R ^= A[0][1] * *K + (RB ^ LB + (i - 1));
 
         S[i] = L;
         S[u] = R;
